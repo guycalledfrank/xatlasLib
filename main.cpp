@@ -69,14 +69,14 @@ extern "C"
 	}
 
 	_declspec(dllexport) void _cdecl xatlasPack(void* atlas, int attempts, float texelsPerUnit, int resolution,
-		int maxChartSize, int padding, bool bruteForce)
+		int maxChartSize, int padding, bool bruteForce, bool blockAlign)
 	{
 		xatlas::PackOptions options;
 		//options.attempts = attempts;
 		options.texelsPerUnit = texelsPerUnit;
 		options.resolution = resolution;
 		options.maxChartSize = maxChartSize;
-		options.blockAlign = true;
+		options.blockAlign = blockAlign;
 		//options.conservative = true;
 		options.bruteForce = bruteForce;
 		options.padding = padding;
@@ -137,7 +137,7 @@ extern "C"
 		return v;
 
 	}
-	_declspec(dllexport) void _cdecl xatlasNormalize(void* atlas, int* atlasSizes)
+	_declspec(dllexport) void _cdecl xatlasNormalize(void* atlas, int* atlasSizes, bool preferDensity)
 	{
 		xatlas::Atlas* a = (xatlas::Atlas*)atlas;
 
@@ -173,15 +173,32 @@ extern "C"
 				float pheight = bounds[i].maxv - bounds[i].minv;
 				float psize = fmax(pwidth, pheight);
 				unsigned long size = nextPowerOfTwo((unsigned long)psize);
+
+				if (preferDensity) size = max(a->width, a->height);
+
 				size = max(size, 16);
 				size = min(size, max(a->width, a->height));
 				atlasSizes[i] = (int)size;
+
+				if (preferDensity)
+				{
+					bounds[i].maxu = size;
+					bounds[i].maxv = size;
+				}
 			}
 		}
 		for (int i = 0; i < atlasCount; i++)
 		{
-			bounds[i].invLenU = 1.0f / (bounds[i].maxu - bounds[i].minu);
-			bounds[i].invLenV = 1.0f / (bounds[i].maxv - bounds[i].minv);
+			if (preferDensity)
+			{
+				bounds[i].invLenU = 1.0f / (bounds[i].maxu);
+				bounds[i].invLenV = 1.0f / (bounds[i].maxv);
+			}
+			else
+			{
+				bounds[i].invLenU = 1.0f / (bounds[i].maxu - bounds[i].minu);
+				bounds[i].invLenV = 1.0f / (bounds[i].maxv - bounds[i].minv);
+			}
 		}
 		for (int meshIndex = 0; meshIndex < a->meshCount; meshIndex++)
 		{
